@@ -1,4 +1,4 @@
-# Presencia — Control de asistencia biométrico escolar local
+# Control de asistencia biométrico escolar
 
 [![CI](https://github.com/mchiroyl/presencia-biometric-attendance/actions/workflows/ci.yml/badge.svg)](https://github.com/mchiroyl/presencia-biometric-attendance/actions/workflows/ci.yml)
 
