@@ -1,0 +1,33 @@
+node_modules/
+dist/
+coverage/
+.tools/
+.env
+.env.development
+.env.local
+# Configuración privada en cualquier carpeta; publicar solo la plantilla.
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+appsettings.Local.json
+local-access.json
+bridge/bin/
+bridge/obj/
+bridge/tests/bin/
+bridge/tests/obj/
+bridge/lib/*.dll
+docs/evidence/*.secret.*
+# Evidencias de ejecución pueden contener nombres, rutas y datos personales.
+docs/evidence/
+# Datos locales y respaldos: no pertenecen al repositorio de código.
+uploads/
+backups/
+*.bak
+*.mdf
+*.ldf
+test-results/
+playwright-report/
+*.log

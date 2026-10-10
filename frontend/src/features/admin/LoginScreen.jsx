@@ -1,0 +1,8 @@
+import { useState } from 'react';
+import { ShieldCheck, ArrowRight, LoaderCircle } from 'lucide-react';
+import { api } from '../../lib/api';
+export function LoginScreen({ onLogin, expired }) {
+  const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  async function submit(e) { e.preventDefault(); setError(''); setBusy(true); const values = Object.fromEntries(new FormData(e.currentTarget)); try { onLogin(await api('/auth/login', { method: 'POST', body: values })); } catch (e) { setError(e.message); } finally { setBusy(false); } }
+  return <div className="page"><div className="page-heading"><div><span className="eyebrow green">ACCESO RESTRINGIDO</span><h1>Administración</h1><p>Gestiona tu comunidad educativa con seguridad.</p></div></div><section className="login-card"><div className="login-icon"><ShieldCheck size={30}/></div><h2>Bienvenido de nuevo</h2><p>Inicia sesión con tu cuenta de administrador.</p>{expired && <div className="inline-message" role="status">Tu sesión terminó. Inicia sesión nuevamente.</div>}<form onSubmit={submit}><label>Correo electrónico<input name="email" type="email" autoComplete="username" required maxLength={254} placeholder="tu.correo@escuela.edu"/></label><label>Contraseña<input name="password" type="password" autoComplete="current-password" required maxLength={128} placeholder="Ingresa tu contraseña"/></label>{error && <div role="alert" className="inline-error">{error}</div>}<button className="primary-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={18}/> : <ShieldCheck size={18}/>}Ingresar<ArrowRight size={18}/></button></form><div className="login-footnote"><ShieldCheck size={14}/>Sesión privada · Expira después de 15 minutos</div></section></div>;
+}

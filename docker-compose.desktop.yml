@@ -1,0 +1,6 @@
+# Arranque íntegro en Docker Desktop SIN fingir acceso a USB.
+# El puente informa desconectado y bloquea captura hasta disponer de un host USB real.
+services:
+  biometric:
+    volumes: !reset []
+    device_cgroup_rules: !reset []

@@ -1,0 +1,13 @@
+import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import dotenv from 'dotenv';
+const values = dotenv.parse(readFileSync('.env'));
+const directory = 'frontend/dist/assets';
+const bundle = readdirSync(directory).filter(name => name.endsWith('.js')).map(name => readFileSync(join(directory, name), 'utf8')).join('\n');
+const privateKeys = ['SQL_SA_PASSWORD', 'SQL_PASSWORD', 'JWT_SECRET', 'DEVICE_TOKEN', 'DEVICE_SIGNING_KEY', 'BIOMETRIC_ENCRYPTION_KEY', 'BOOTSTRAP_ADMIN_PASSWORD'];
+for (const key of privateKeys) if (values[key] && bundle.includes(values[key])) throw new Error('Un valor privado apareció en el bundle. No se imprime.');
+if (!bundle.includes(values.VITE_BRIDGE_TOKEN)) throw new Error('La configuración pública del puente no se cargó');
+if (['local-access.json', 'backend/.env.development', 'frontend/.env.local', 'bridge/appsettings.Local.json'].some(path => existsSync(path))) throw new Error('Quedan copias antiguas de configuración');
+const report = { privateSecretsAbsentFromClientBundle: true, checkedPrivateKeys: privateKeys.length, publicBridgeConfigurationLoaded: true, obsoleteConfigurationRemoved: true };
+writeFileSync('docs/evidence/environment-check.json', JSON.stringify(report, null, 2));
+console.log(JSON.stringify(report));

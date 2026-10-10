@@ -1,0 +1,3 @@
+# Instalar en /etc/udev/rules.d del HOST Linux. Crear previamente grupo school-biometric GID 10001.
+# Solo el lector real 05ba:000a recibe acceso; nunca chmod 666 ni privileged.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="05ba", ATTR{idProduct}=="000a", GROUP="school-biometric", MODE="0660"

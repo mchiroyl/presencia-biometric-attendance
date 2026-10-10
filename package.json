@@ -1,0 +1,17 @@
+{
+  "name": "school-biometric-local",
+  "private": true,
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "setup": "node scripts/setup-local.mjs",
+    "db:init": "npm run db:init -w backend",
+    "dev:backend": "npm run start:dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "test": "npm test -w backend && npm test -w frontend",
+    "test:integration": "npm run test:integration -w backend",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": { "@playwright/test": "^1.56.0" },
+  "engines": { "node": ">=22.12" }
+}

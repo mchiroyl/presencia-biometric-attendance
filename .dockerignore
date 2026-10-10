@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/bin
+**/obj
+.tools
+.git
+.env
+**/.env*
+**/appsettings.Local.json
+local-access.json
+docs/evidence
+test-results
+playwright-report
+*.log

@@ -1,0 +1,55 @@
+const { test, expect } = require('@playwright/test');
+const { readFileSync } = require('node:fs');
+const { randomUUID } = require('node:crypto');
+const environment = require('dotenv').parse(readFileSync('.env', 'utf8'));
+const credentials = { email: environment.BOOTSTRAP_ADMIN_EMAIL, password: environment.BOOTSTRAP_ADMIN_PASSWORD };
+const loginData = { email: credentials.email, password: credentials.password };
+test.beforeAll(async ({ request }) => {
+  const login = await request.post('http://127.0.0.1:3000/auth/login', { data: loginData }); expect(login.ok()).toBe(true); const session = await login.json();
+  const headers = { Authorization: `Bearer ${session.accessToken}` };
+  const result = await request.get('http://127.0.0.1:3000/admin/employees?search=Docente%20E2E&limit=100', { headers }); expect(result.ok()).toBe(true);
+  for (const employee of (await result.json()).items) if (employee.active && /^Docente E2E [a-f0-9]{8}$/.test(employee.fullName)) await request.delete(`http://127.0.0.1:3000/admin/employees/${employee.id}`, { headers });
+});
+test('administrador crea, enrola y marca asistencia con puente C# real en simulación', async ({ page, request }) => {
+  const id = randomUUID().slice(0, 8); const name = `Docente E2E ${id}`;
+  await page.goto('/#admin');
+  await page.getByLabel('Correo electrónico').fill(credentials.email); await page.getByLabel('Contraseña', { exact: true }).fill(credentials.password);
+  await page.getByRole('button', { name: 'Ingresar' }).click();
+  await expect(page.getByRole('heading', { name: 'Directorio de empleados' })).toBeVisible();
+  await page.getByRole('button', { name: 'Nuevo empleado' }).click();
+  await expect(page.getByLabel('Código de empleado')).toHaveAttribute('readonly', '');
+  await page.getByLabel('Nombre completo', { exact: true }).fill(name); await page.getByLabel('Puesto', { exact: true }).fill('Docente');
+  await page.getByLabel('El empleado ha leído y firmado el consentimiento.').check();
+  await page.getByLabel('Firma: nombre completo del firmante').fill(name);
+  const createdResponse = page.waitForResponse(response => response.url().endsWith('/admin/employees') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Guardar empleado' }).click();
+  const created = await (await createdResponse).json(); const code = created.code; expect(code).toMatch(/^EMP-\d{6,}$/);
+  await page.getByLabel('Buscar empleado').fill(code);
+  const row = page.getByRole('row').filter({ hasText: code }); await expect(row).toBeVisible(); await expect(page.getByText('Lector simulado · Solo pruebas', { exact: true })).toBeVisible();
+  await row.getByRole('button', { name: `Editar ${name}` }).click();
+  await expect(page.getByLabel('Código de empleado')).toHaveValue(code);
+  await expect(page.getByLabel('Código de empleado')).toHaveAttribute('readonly', '');
+  await page.getByLabel('Puesto', { exact: true }).fill('Coordinación');
+  await page.screenshot({ path: 'docs/evidence/employee-edit.png', fullPage: true });
+  await page.getByRole('button', { name: 'Guardar empleado' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(row.getByText('Coordinación')).toBeVisible();
+  await row.getByRole('button', { name: 'Enrolar', exact: true }).click(); await expect(page.getByText('Huella registrada correctamente.')).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: 'docs/evidence/admin-desktop.png', fullPage: true });
+  await page.getByRole('link', { name: 'Kiosco de asistencia' }).click();
+  await expect(page.getByText('Lector simulado · Solo pruebas', { exact: true }).first()).toBeVisible(); await expect(page.getByText('En línea', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Simular lectura' }).click(); await expect(page.getByText('Entrada registrada', { exact: true })).toBeVisible(); await expect(page.getByText(new RegExp(name))).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: 'docs/evidence/kiosk-desktop.png', fullPage: true });
+  await page.getByRole('button', { name: 'Simular lectura' }).click(); await expect(page.getByText('Espere antes de volver a marcar')).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 }); await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: 'docs/evidence/kiosk-mobile.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // Aísla cada ejecución: retira la plantilla simulada y conserva el historial de prueba auditado.
+  const login = await request.post('http://127.0.0.1:3000/auth/login', { data: loginData }); expect(login.ok()).toBe(true); const session = await login.json();
+  const rows = await request.get(`http://127.0.0.1:3000/admin/employees?search=${code}`, { headers: { Authorization: `Bearer ${session.accessToken}` } }); const list = await rows.json();
+  const employee = list.items.find(e => e.code === code); if (employee) await request.delete(`http://127.0.0.1:3000/admin/employees/${employee.id}`, { headers: { Authorization: `Bearer ${session.accessToken}` } });
+});
+test('rechaza token WebSocket inválido sin emitir ready', async ({ page }) => {
+  await page.goto('/');
+  const wrongToken = await page.evaluate(() => new Promise(resolve => { const socket = new WebSocket('ws://127.0.0.1:8080?token=wrong'); let ready = false; socket.onmessage = () => { ready = true; }; socket.onclose = () => resolve(!ready); socket.onerror = () => {}; setTimeout(() => { socket.close(); resolve(false); }, 3000); }));
+  expect(wrongToken).toBe(true);
+});

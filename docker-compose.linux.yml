@@ -1,0 +1,114 @@
+services:
+  sqlserver:
+    environment:
+      MSSQL_PID: Express
+  db-init:
+    image: school-api:latest
+    build:
+      context: .
+      dockerfile: docker/node.Dockerfile
+      target: api
+    environment:
+      CONTAINERIZED: 'true'
+      SQL_HOST: sqlserver
+      SQL_PORT: '1433'
+      SQL_DATABASE: ${SQL_DATABASE}
+      SQL_USERNAME: ${SQL_USERNAME}
+      SQL_PASSWORD: ${SQL_PASSWORD}
+      SQL_SA_PASSWORD: ${SQL_SA_PASSWORD}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      DEVICE_TOKEN: ${DEVICE_TOKEN}
+      DEVICE_SIGNING_KEY: ${DEVICE_SIGNING_KEY}
+      BIOMETRIC_ENCRYPTION_KEY: ${BIOMETRIC_ENCRYPTION_KEY}
+      DEVICE_ID: ${DEVICE_ID}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      SCHOOL_TIMEZONE: ${SCHOOL_TIMEZONE}
+    command: ['node', 'backend/dist/database/init.js']
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: 'no'
+  api:
+    image: school-api:latest
+    build:
+      context: .
+      dockerfile: docker/node.Dockerfile
+      target: api
+    environment:
+      CONTAINERIZED: 'true'
+      SQL_HOST: sqlserver
+      SQL_PORT: '1433'
+      SQL_DATABASE: ${SQL_DATABASE}
+      SQL_USERNAME: ${SQL_USERNAME}
+      SQL_PASSWORD: ${SQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      DEVICE_TOKEN: ${DEVICE_TOKEN}
+      DEVICE_SIGNING_KEY: ${DEVICE_SIGNING_KEY}
+      BIOMETRIC_ENCRYPTION_KEY: ${BIOMETRIC_ENCRYPTION_KEY}
+      DEVICE_ID: ${DEVICE_ID}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      SCHOOL_TIMEZONE: ${SCHOOL_TIMEZONE}
+      MIN_MARK_INTERVAL_SECONDS: ${MIN_MARK_INTERVAL_SECONDS:-30}
+      ALLOW_SIMULATION: 'false'
+    ports: ['127.0.0.1:3000:3000']
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    security_opt: ['no-new-privileges:true']
+  biometric:
+    image: school-libfprint:latest
+    build:
+      context: .
+      dockerfile: bridge-linux/Dockerfile
+    environment:
+      BRIDGE_TOKEN: ${VITE_BRIDGE_TOKEN}
+      DEVICE_TOKEN: ${DEVICE_TOKEN}
+      DEVICE_SIGNING_KEY: ${DEVICE_SIGNING_KEY}
+      DEVICE_ID: ${DEVICE_ID}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      API_URL: http://api:3000
+    ports: ['127.0.0.1:8080:8080']
+    volumes:
+      - type: bind
+        source: ${USB_BUS_PATH:-/dev/bus/usb}
+        target: /dev/bus/usb
+        bind:
+          create_host_path: false
+    device_cgroup_rules: ['c 189:* rw']
+    group_add: ['${BIOMETRIC_USB_GID:-10001}']
+    depends_on:
+      api:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ['/tmp:size=16m,noexec,nosuid']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    healthcheck:
+      test: ['CMD', 'python3', '-c', "import socket; s=socket.create_connection(('127.0.0.1',8080),2); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: docker/node.Dockerfile
+      target: web
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_WS_BRIDGE_URL: ${VITE_WS_BRIDGE_URL}
+        VITE_BRIDGE_TOKEN: ${VITE_BRIDGE_TOKEN}
+    ports: ['127.0.0.1:5173:8080']
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt: ['no-new-privileges:true']
