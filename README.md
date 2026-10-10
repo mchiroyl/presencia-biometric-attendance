@@ -1,5 +1,15 @@
 # Presencia — Control de asistencia biométrico escolar local
 
+[![CI](https://github.com/mchiroyl/presencia-biometric-attendance/actions/workflows/ci.yml/badge.svg)](https://github.com/mchiroyl/presencia-biometric-attendance/actions/workflows/ci.yml)
+
+## Integración continua
+
+GitHub Actions ejecuta `.github/workflows/ci.yml` en cada push, pull request hacia `main` y ejecución manual. Comprueba las pruebas unitarias del backend y frontend, la compilación y la autorización del puente Python. Un segundo trabajo levanta SQL Server Express temporal, aplica las migraciones y ejecuta las pruebas de integración de la API y la base de datos.
+
+El CI genera un `.env` desechable con secretos aleatorios. La contraseña SQL publicada en el workflow corresponde exclusivamente al contenedor temporal de pruebas; nunca se debe usar en una instalación real. No requiere secretos de GitHub ni acceso a datos locales. Las pruebas de integración utilizan datos sintéticos y simulación de prueba, sin cambiar la configuración de producción. El workflow no valida capturas físicas, LED, reconexión USB ni enrolamiento con una persona real; estas comprobaciones se realizan localmente según `docs/HARDWARE.md` y `docs/PRUEBAS.md`.
+
+El token de Actions tiene únicamente permiso de lectura, las acciones están fijadas a un commit y las credenciales de checkout no se conservan. El workflow no despliega ni publica archivos de configuración, datos o respaldos.
+
 Estado actualizado: 10 de octubre de 2026. La instalación actual ejecuta SQL Server Express, NestJS/TypeORM, React compilado servido por Nginx y el puente Python/libfprint en Docker. El puente C# permanece como alternativa histórica; no interviene en este arranque. El sistema de producción utiliza el lector real y mantiene la simulación deshabilitada.
 
 ## Arranque en esta computadora

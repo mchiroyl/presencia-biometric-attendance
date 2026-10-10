@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# CI solo lee código; no publica, despliega ni modifica el repositorio.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-and-build:
+    name: Unit tests and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Generate disposable configuration
+        run: npm run setup
+      - run: npm test
+      - run: npm run build
+      - name: Bridge authorization tests (no hardware)
+        working-directory: bridge-linux
+        run: python3 -m unittest test_security.py
+
+  sql-integration:
+    name: SQL Server integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # Credencial pública SOLO para el servicio efímero de CI, nunca producción.
+      SQL_SA_PASSWORD: 'CI-only!Disposable-Sql-2026'
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_PID: Express
+          MSSQL_SA_PASSWORD: 'CI-only!Disposable-Sql-2026'
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P CI-only!Disposable-Sql-2026 -C -Q 'SELECT 1' -b"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+          --health-start-period 20s
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Generate disposable configuration
+        run: npm run setup
+      - run: npm run build -w backend
+      - name: Initialize database and run migrations
+        run: npm run db:init
+      - name: API and database integration tests
+        run: npm run test:integration
